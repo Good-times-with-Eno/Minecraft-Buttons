@@ -448,7 +448,7 @@ def draw_screen():
             y = inv_start_y + row * (item_size + padding + text_height) # Add vertical space for text
 
             # Stop drawing if going off bottom (above back button)
-            back_button_top = height # Default to bottom if no back button
+            back_button_top = game_state.screen.get_height() # Default to bottom if no back button
             if game_state.buttons and game_state.buttons[-1]["action"] == "goto_main":
                  back_button_top = game_state.buttons[-1]["rect"].top
             if y + item_size + text_height > back_button_top - ELEMENT_SPACING:
