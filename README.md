@@ -14,5 +14,5 @@ Thanks people!
 
 
 **COPYRIGHT STATEMENT**
-This project is copyright 2025, with the liscense **CC BY-NC-ND**, meaning that you can download this project and share them with others as long as the original creator, GoodtimeswithEno, is credited. Importantly, the sharing of the work cannot be done as part of a commercial activity.
-To see more information on this liscense, see https://creativecommons.org/licenses/by-nc-nd/4.0/deed.en.
+This project is copyright 2025, with the license **CC BY-NC-ND**, meaning that you can download this project and share them with others as long as the original creator, GoodtimeswithEno, is credited. Importantly, the sharing of the work cannot be done as part of a commercial activity.
+To see more information on this license, see https://creativecommons.org/licenses/by-nc-nd/4.0/deed.en.
