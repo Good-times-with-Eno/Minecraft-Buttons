@@ -8,6 +8,7 @@ import data_loader
 import ui_manager
 import event_handler
 import game_logic
+import save_manager
 
 # --- Main Function ---
 def main():
@@ -20,7 +21,7 @@ def main():
             (constants.INITIAL_SCREEN_WIDTH, constants.INITIAL_SCREEN_HEIGHT),
             pygame.RESIZABLE
         )
-        pygame.display.set_caption("Minecraft (Buttons) v1.0.2-Refactored") # Updated version name
+        pygame.display.set_caption("Minecraft (Buttons) v1.0.3-SaveLoad") # Updated version name
     except pygame.error as e:
         print(f"Fatal Error: Could not set video mode: {e}")
         pygame.quit()
@@ -30,15 +31,20 @@ def main():
     game_state.clock = pygame.time.Clock()
 
     # --- Load Data ---
+    # 1. Load base game data (mine lists, speeds, default inventory structure)
     if not data_loader.load_mining_data():
         # data_loader sets the status_message on error
         game_state.current_screen = constants.ERROR_STATE
         print("Failed to load data. Entering error state.")
         # Proceed to initialize UI even in error state to show the message
+    else:
+        # 2. Attempt to load saved inventory counts AFTER initial structures are ready
+        # This will overwrite the default counts loaded by data_loader if successful
+        save_manager.load_game() # <-- Load saved game data
 
     # --- Initialize UI ---
     ui_manager.initialize_fonts() # Initialize fonts first
-    # Initial layout update based on current (possibly error) state
+    # Initial layout update based on current (possibly error or loaded) state
     try:
         ui_manager.update_layout(game_state.screen.get_width(), game_state.screen.get_height())
     except Exception as e:
@@ -76,6 +82,12 @@ def main():
         else: # Should not happen, but safety check
              pygame.time.wait(1000 // constants.FPS_LIMIT)
 
+
+    # --- Save Game Before Quitting ---
+    if game_state.current_screen != constants.ERROR_STATE: # Avoid saving if data didn't load
+        save_manager.save_game() # <-- Save game data before exiting
+    else:
+        print("Skipping save due to initial data load error.")
 
     # --- Quit Pygame ---
     print("Exiting game.")

@@ -4,7 +4,7 @@ Development will be slow, so please be patient.
 Any issues or questions can be posted on the issues tab. I will try to answer as soon as possible.
 Thanks people!
 **IMPORTANT**
-**Pygame is required for this project to work. To install pygame, go into your terminal, and type "pip3 install pygame".**
+**Pygame and cryptography is required for this project to work. To install pygame, go into your terminal, and type "pip3 install pygame" and "pip3 install cryptography".**
 
 
 
