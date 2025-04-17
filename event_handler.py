@@ -5,8 +5,10 @@ import game_state
 import constants
 import ui_manager # For layout updates
 import game_logic # For starting mining
+import save_manager # To load game on world select
 
 def _handle_quantity_confirmation():
+    # (Keep this helper function as is)
     """Helper function to validate and start mining from ASK_QUANTITY screen."""
     try:
         if game_state.accumulated_input:
@@ -17,8 +19,6 @@ def _handle_quantity_confirmation():
                 pass
             else:
                 # Failure: start_mining already set the error message and state
-                # We might need to ensure layout is updated if start_mining didn't
-                # (though it currently does on failure)
                 pass
         else:
             game_state.status_message = f"Please enter a quantity (1-64)."
@@ -39,6 +39,7 @@ def process_events():
             game_state.running = False
 
         elif event.type == pygame.VIDEORESIZE:
+            # (Keep resize handling as is)
             try:
                 game_state.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                 ui_manager.update_layout(event.w, event.h)
@@ -47,7 +48,7 @@ def process_events():
 
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_f:
-                # --- Fullscreen Toggle ---
+                # (Keep fullscreen toggle as is)
                 game_state.fullscreen = not game_state.fullscreen
                 try:
                     if game_state.fullscreen:
@@ -59,7 +60,6 @@ def process_events():
                 except pygame.error as e:
                     print(f"Error toggling fullscreen: {e}")
                     game_state.fullscreen = not game_state.fullscreen # Revert state
-                    # Try to restore previous mode (simplified)
                     try:
                         game_state.screen = pygame.display.set_mode((constants.INITIAL_SCREEN_WIDTH, constants.INITIAL_SCREEN_HEIGHT), pygame.RESIZABLE)
                         needs_layout_update = True
@@ -68,36 +68,23 @@ def process_events():
                         game_state.running = False
 
             elif game_state.current_screen == constants.ASK_QUANTITY:
-                # --- Quantity Input ---
+                # (Keep quantity input handling as is)
                 if event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
                     _handle_quantity_confirmation() # Use helper function
 
                 elif event.key == pygame.K_BACKSPACE:
                     game_state.accumulated_input = game_state.accumulated_input[:-1]
                 elif event.unicode.isdigit():
-                    # Limit input length (e.g., to 2 digits for 1-64)
                     if len(game_state.accumulated_input) < 2:
                         game_state.accumulated_input += event.unicode
-                    # Optional: Add validation here to prevent typing > 64 early
-                    # try:
-                    #     if int(game_state.accumulated_input + event.unicode) > 64:
-                    #         pass # Don't add the digit
-                    #     elif len(game_state.accumulated_input) < 2:
-                    #          game_state.accumulated_input += event.unicode
-                    # except ValueError: # Should not happen if only digits allowed
-                    #     pass
 
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
+            # (Keep MOUSEBUTTONDOWN logic as is)
             if event.button == 1: # Left mouse button
                 for button in game_state.buttons:
                     if button["rect"].collidepoint(mouse_pos):
                         button["pressed"] = True
-                # Basic check for clicking inside the input field (no visual change yet)
-                # if game_state.current_screen == constants.ASK_QUANTITY and \
-                #    game_state.input_field_rect and \
-                #    game_state.input_field_rect.collidepoint(mouse_pos):
-                #     print("Clicked input field") # Placeholder for potential focus logic
 
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1: # Left mouse button
@@ -109,15 +96,34 @@ def process_events():
                     # Check if button was pressed *and* mouse is still over it on release
                     if button["pressed"] and button["rect"].collidepoint(mouse_pos):
                         clicked_button_action = button["action"]
-                        clicked_button_data = button["data"]
+                        clicked_button_data = button["data"] # data can be slot_id or block_key
                     button["pressed"] = False # Reset visual state regardless
 
                 if clicked_button_action:
-                    game_state.status_message = "" # Clear status on most actions
+                    # Clear status on most actions, except potentially on world select failure?
+                    # Let's clear it for now. load_game will print messages.
+                    game_state.status_message = ""
 
                     # --- Handle Button Actions ---
                     if clicked_button_action == "quit_game":
                         game_state.running = False
+                    elif clicked_button_action == "select_world":
+                        selected_slot = clicked_button_data
+                        print(f"Attempting to load world {selected_slot}...")
+                        # Set the current world ID *before* loading
+                        game_state.current_world_id = selected_slot
+                        # load_game now handles resetting inventory if needed
+                        if save_manager.load_game(selected_slot):
+                            print(f"World {selected_slot} loaded/initialized.")
+                            game_state.current_screen = constants.MAIN_MENU
+                            needs_layout_update = True # Go to main menu layout
+                        else:
+                            # Loading failed critically (e.g., key error), stay on select screen?
+                            # Or maybe go to error state? Let's stay here for now.
+                            # load_game prints errors. We might set a status message.
+                            game_state.status_message = f"Error loading world {selected_slot}. Check console."
+                            game_state.current_world_id = None # Reset world ID if load failed
+                            # No screen change, redraw needed to show status
                     elif clicked_button_action == "goto_main":
                         game_state.current_screen = constants.MAIN_MENU
                     elif clicked_button_action == "goto_mining":
@@ -133,22 +139,17 @@ def process_events():
                         game_state.current_screen = constants.ASK_QUANTITY
                         game_state.accumulated_input = ""
                     elif clicked_button_action == "confirm_quantity":
-                         # Handle the OK button click using the helper
                          _handle_quantity_confirmation()
-                         # Check if screen changed *after* handling confirmation
                          if game_state.current_screen != previous_screen:
                              needs_layout_update = True
-                         # No 'else:' needed here, helper handles status/state
 
 
-                    # Check if screen change requires layout update (for non-confirmation actions)
-                    # The confirmation action handles its own potential layout update check above
-                    if clicked_button_action != "confirm_quantity" and game_state.current_screen != previous_screen:
+                    # Check if screen change requires layout update (for non-confirmation/non-select_world actions)
+                    if clicked_button_action not in ["confirm_quantity", "select_world"] and game_state.current_screen != previous_screen:
                         needs_layout_update = True
 
-    # Update layout if flagged by any event OR if screen changed during confirmation
+    # Update layout if flagged by any event OR if screen changed
     if needs_layout_update:
         # Ensure screen dimensions are current before updating layout
         current_width, current_height = game_state.screen.get_size()
         ui_manager.update_layout(current_width, current_height)
-

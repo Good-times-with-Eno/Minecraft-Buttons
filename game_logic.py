@@ -86,4 +86,3 @@ def check_mining_completion():
              # Duration is 0 or less, finish immediately (shouldn't normally happen)
              print("Warning: Mining duration was zero or negative. Finishing immediately.")
              finish_mining()
-

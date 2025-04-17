@@ -9,12 +9,13 @@ clock = None # Initialize in main
 
 # --- Game State ---
 running = True
-current_screen = constants.MAIN_MENU # Use constant for initial state
+current_screen = constants.SELECT_WORLD # Start at the world selection screen
+current_world_id = None # Track the loaded world slot (1 to MAX_SAVE_SLOTS)
 
 # --- Game Data ---
 mine_speeds = {}
 mine_list = {0: "Back"} # Use 0 for Back consistently
-inventory = {}
+inventory = {} # Inventory will be loaded/reset per world
 tool_headers = [] # Stores tool names from the header
 
 # --- Dynamic UI Elements ---

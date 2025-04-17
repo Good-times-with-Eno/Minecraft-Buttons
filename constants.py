@@ -13,12 +13,15 @@ GRAY = (200, 200, 200)
 LIGHT_GRAY = (230, 230, 230) # For input field background
 BUTTON_PRESSED_COLOR = (100, 100, 100)
 DARK_GREEN = (0, 100, 0) # For mining progress, status messages
+SLOT_EMPTY_COLOR = (150, 150, 150) # Color for empty slot buttons
+SLOT_EXISTS_COLOR = (180, 220, 180) # Color for existing slot buttons
 
 # --- Configuration ---
 INITIAL_SCREEN_WIDTH = 800
 INITIAL_SCREEN_HEIGHT = 600
 FPS_LIMIT = 45 # Define FPS limit as a constant
 CURSOR_BLINK_RATE = 500 # Milliseconds for cursor blink cycle (on/off)
+MAX_SAVE_SLOTS = 5 # Define the number of save slots
 
 # --- Font ---
 # Define the path to the font file relative to this constants.py file
@@ -36,6 +39,7 @@ except pygame.error as e:
 
 
 # --- Game States ---
+SELECT_WORLD = 'select_world' # New screen state
 MAIN_MENU = 'main_menu'
 MINING_MENU = 'mining_menu'
 ASK_QUANTITY = 'ask_quantity'

@@ -21,7 +21,7 @@ def main():
             (constants.INITIAL_SCREEN_WIDTH, constants.INITIAL_SCREEN_HEIGHT),
             pygame.RESIZABLE
         )
-        pygame.display.set_caption("Minecraft (Buttons) v1.0.3-SaveLoad") # Updated version name
+        pygame.display.set_caption("Minecraft (Buttons) v1.0.4-MultiWorld") # Updated version name
     except pygame.error as e:
         print(f"Fatal Error: Could not set video mode: {e}")
         pygame.quit()
@@ -30,21 +30,22 @@ def main():
     # --- Clock Setup (using game_state) ---
     game_state.clock = pygame.time.Clock()
 
-    # --- Load Data ---
-    # 1. Load base game data (mine lists, speeds, default inventory structure)
+    # --- Load Base Data ---
+    # Load fundamental game data (block types, speeds, etc.) FIRST.
+    # Inventory structure is initialized here but will be overwritten/reset by load_game.
     if not data_loader.load_mining_data():
         # data_loader sets the status_message on error
         game_state.current_screen = constants.ERROR_STATE
-        print("Failed to load data. Entering error state.")
+        print("Failed to load base data. Entering error state.")
         # Proceed to initialize UI even in error state to show the message
-    else:
-        # 2. Attempt to load saved inventory counts AFTER initial structures are ready
-        # This will overwrite the default counts loaded by data_loader if successful
-        save_manager.load_game() # <-- Load saved game data
+    # else:
+        # World-specific data (inventory) is loaded AFTER the user selects a world
+        # via the event handler calling save_manager.load_game().
+        # No initial load_game() call here anymore.
 
     # --- Initialize UI ---
     ui_manager.initialize_fonts() # Initialize fonts first
-    # Initial layout update based on current (possibly error or loaded) state
+    # Initial layout update based on the starting screen (SELECT_WORLD or ERROR_STATE)
     try:
         ui_manager.update_layout(game_state.screen.get_width(), game_state.screen.get_height())
     except Exception as e:
@@ -57,7 +58,7 @@ def main():
     # --- Game Loop ---
     while game_state.running:
         # --- Event Handling ---
-        # Handles input, state changes, and flags layout updates
+        # Handles input, state changes (including world loading), and flags layout updates
         event_handler.process_events()
 
         # --- Game Logic Update ---
@@ -84,10 +85,15 @@ def main():
 
 
     # --- Save Game Before Quitting ---
-    if game_state.current_screen != constants.ERROR_STATE: # Avoid saving if data didn't load
-        save_manager.save_game() # <-- Save game data before exiting
+    # Only save if we successfully loaded a world and didn't end in an error state
+    if game_state.current_world_id is not None and game_state.current_screen != constants.ERROR_STATE:
+        print(f"Saving game for world {game_state.current_world_id}...")
+        save_manager.save_game(game_state.current_world_id) # <-- Save game data for the current world
+    elif game_state.current_screen == constants.ERROR_STATE:
+        print("Skipping save due to error state.")
     else:
-        print("Skipping save due to initial data load error.")
+        print("Skipping save as no world was loaded.")
+
 
     # --- Quit Pygame ---
     print("Exiting game.")
