@@ -1,4 +1,0 @@
-Block,Hardness,Tool,Default,Wooden,Stone,Iron,Diamond,Netherite,Golden,Shears,Sword
-Oak log,2,pickaxe,3,1.5,0.75,0.5,0.4,0.35,0.25,-,-
-# Add other block types here, one per line, following the format above.
-# Use '-' where the tool speed is the same as the Default speed.
