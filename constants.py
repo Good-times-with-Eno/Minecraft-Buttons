@@ -5,6 +5,10 @@ import pygame.font # Import the font module
 # --- Initialize Pygame Modules ---
 pygame.init() # Initialize all pygame modules
 pygame.font.init() # Initialize the font module specifically
+SCREEN_WIDTH = 1024
+SCREEN_HEIGHT = 768
+MIN_WIDTH = 800  # Minimum dimensions if resizing
+MIN_HEIGHT = 600
 
 # --- Colors ---
 WHITE = (255, 255, 255)
@@ -47,3 +51,4 @@ MINING_INPROGRESS = 'mining_inprogress'
 INVENTORY_SCREEN = 'inventory_screen'
 CRAFTING_SCREEN = 'crafting_screen'
 ERROR_STATE = 'error_state'
+SELECT_WORLD = 'select_world'

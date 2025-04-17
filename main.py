@@ -1,102 +1,99 @@
+# /Users/newenoch/Documents/Visual Studio Code/Minecraft (Buttons)/1.0.1-beta/main.py
 import pygame
 import sys
-
-# --- Import Game Modules ---
 import constants
 import game_state
 import data_loader
-import ui_manager
+# Correct import path for display_manager inside ui_manager folder
+from ui_manager import display_manager # Adjusted import
 import event_handler
-import game_logic
-import save_manager
+import game_logic # Import game_logic
+import save_manager # Keep save_manager import
 
-# --- Main Function ---
 def main():
     pygame.init()
+    pygame.font.init() # Ensure font module is initialized
 
-    # --- Screen Setup (using game_state) ---
+    # --- Initial Screen Setup ---
     try:
-        # Initial screen mode
-        game_state.screen = pygame.display.set_mode(
-            (constants.INITIAL_SCREEN_WIDTH, constants.INITIAL_SCREEN_HEIGHT),
-            pygame.RESIZABLE
-        )
-        pygame.display.set_caption("Minecraft (Buttons) v1.0.4-MultiWorld") # Updated version name
+        game_state.screen = pygame.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT), pygame.RESIZABLE)
+        pygame.display.set_caption("Minecraft (Buttons) - 1.0.1")
     except pygame.error as e:
-        print(f"Fatal Error: Could not set video mode: {e}")
-        pygame.quit()
+        print(f"Fatal Error: Could not set display mode: {e}")
         sys.exit()
 
-    # --- Clock Setup (using game_state) ---
-    game_state.clock = pygame.time.Clock()
-
-    # --- Load Base Data ---
-    # Load fundamental game data (block types, speeds, etc.) FIRST.
-    # Inventory structure is initialized here but will be overwritten/reset by load_game.
+    # --- Load Assets and Data ---
     if not data_loader.load_mining_data():
-        # data_loader sets the status_message on error
-        game_state.current_screen = constants.ERROR_STATE
-        print("Failed to load base data. Entering error state.")
-        # Proceed to initialize UI even in error state to show the message
-    # else:
-        # World-specific data (inventory) is loaded AFTER the user selects a world
-        # via the event handler calling save_manager.load_game().
-        # No initial load_game() call here anymore.
+        # Error handled in loader, maybe switch to error screen or exit
+        print("Failed to load essential mining/item data. Exiting.")
+        # Optionally switch to an error screen before exiting
+        # game_state.current_screen = constants.ERROR_STATE
+        # display_manager.update_layout(...) # Need screen size
+        # display_manager.draw_screen()
+        # pygame.display.flip()
+        # pygame.time.wait(5000)
+        sys.exit()
 
     # --- Initialize UI ---
-    ui_manager.initialize_fonts() # Initialize fonts first
-    # Initial layout update based on the starting screen (SELECT_WORLD or ERROR_STATE)
-    try:
-        ui_manager.update_layout(game_state.screen.get_width(), game_state.screen.get_height())
-    except Exception as e:
-         print(f"Fatal Error during initial layout: {e}")
-         # If layout fails critically, we probably can't continue
-         pygame.quit()
-         sys.exit()
+    display_manager.initialize_fonts() # Initialize fonts via display_manager
 
+    # --- Initialize Recipes (AFTER item data is loaded) ---
+    game_logic.initialize_recipes() # Call recipe initialization here
 
-    # --- Game Loop ---
+    # --- Initial Layout ---
+    # Get current screen size for initial layout
+    current_width, current_height = game_state.screen.get_size()
+    display_manager.update_layout(current_width, current_height)
+
+    # --- Game Clock ---
+    game_state.clock = pygame.time.Clock()
+
+    # --- Main Game Loop ---
     while game_state.running:
         # --- Event Handling ---
-        # Handles input, state changes (including world loading), and flags layout updates
         event_handler.process_events()
 
-        # --- Game Logic Update ---
-        # Check if mining is finished (only relevant if in progress)
-        game_logic.check_mining_completion()
+        # --- Game Logic Updates (e.g., check mining completion) ---
+        if game_state.current_screen == constants.MINING_INPROGRESS:
+            current_time = pygame.time.get_ticks() / 1000.0
+            if game_state.mining_duration > 0 and current_time >= game_state.mining_start_time + game_state.mining_duration:
+                # Mining finished
+                block_id = game_state.selected_block_for_mining
+                quantity = game_state.mining_quantity
+                block_name = game_state.mine_list.get(block_id, f"ID {block_id}")
+
+                # Add to inventory
+                game_state.inventory[block_id] = game_state.inventory.get(block_id, 0) + quantity
+
+                # Reset mining state and go back to main menu
+                game_state.status_message = f"Mined {quantity} {block_name}(s)."
+                print(game_state.status_message) # Also print to console
+                game_state.current_screen = constants.MAIN_MENU
+                game_state.mining_quantity = 0
+                game_state.selected_block_for_mining = None
+                game_state.mining_start_time = 0
+                game_state.mining_duration = 0
+                game_state.mining_progress_text = ""
+                # Update layout for the new screen
+                w, h = game_state.screen.get_size()
+                display_manager.update_layout(w, h)
+
 
         # --- Drawing ---
-        # Draws the current screen based entirely on game_state
-        if game_state.screen: # Check if screen is still valid
-            ui_manager.draw_screen()
-        else:
-            print("Error: Screen object lost during main loop.")
-            game_state.running = False # Exit loop if screen is lost
+        display_manager.draw_screen() # Draw based on current state
 
         # --- Update Display ---
-        if game_state.screen:
-            pygame.display.flip()
+        pygame.display.flip()
 
-        # --- Cap Frame Rate ---
-        if game_state.clock:
-            game_state.clock.tick(constants.FPS_LIMIT)
-        else: # Should not happen, but safety check
-             pygame.time.wait(1000 // constants.FPS_LIMIT)
+        # --- Frame Limiting ---
+        game_state.clock.tick(constants.FPS_LIMIT)
 
+    # --- Quit ---
+    # Optional: Save game before quitting if in a world?
+    # if game_state.current_world_id is not None:
+    #     print("Auto-saving on quit...")
+    #     save_manager.save_game(game_state.current_world_id)
 
-    # --- Save Game Before Quitting ---
-    # Only save if we successfully loaded a world and didn't end in an error state
-    if game_state.current_world_id is not None and game_state.current_screen != constants.ERROR_STATE:
-        print(f"Saving game for world {game_state.current_world_id}...")
-        save_manager.save_game(game_state.current_world_id) # <-- Save game data for the current world
-    elif game_state.current_screen == constants.ERROR_STATE:
-        print("Skipping save due to error state.")
-    else:
-        print("Skipping save as no world was loaded.")
-
-
-    # --- Quit Pygame ---
-    print("Exiting game.")
     pygame.quit()
     sys.exit()
 
