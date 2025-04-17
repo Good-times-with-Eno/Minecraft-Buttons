@@ -54,3 +54,9 @@ INVENTORY_SCREEN = 'inventory_screen'
 CRAFTING_SCREEN = 'crafting_screen'
 ERROR_STATE = 'error_state'
 SELECT_WORLD = 'select_world'
+
+# --- Asset Paths ---
+TEXTURES_DIR = "textures"
+
+# --- UI Constants ---
+ITEM_TEXTURE_SIZE = (32,32)

@@ -545,17 +545,39 @@ def draw_screen():
             item_rect = pygame.Rect(x, y, item_size, item_size)
             inventory_item_rects.append({"rect": item_rect, "id": item_id, "name": item_name, "count": count})
 
-            # Basic item representation (colored square)
-            item_color = constants.ITEM_COLORS.get(item_name, constants.GRAY) # Use ITEM_COLORS
-            pygame.draw.rect(game_state.screen, item_color, item_rect, border_radius=3)
+            # --- Draw Item Texture ---
+            texture = game_state.item_textures.get(item_id)
+            if texture:
+                # Scale texture to fit the item_rect size (or use pre-scaled if available)
+                # For now, let's scale it on the fly if needed, assuming textures are loaded at ITEM_TEXTURE_SIZE
+                # A better approach might be to pre-scale textures for different UI contexts (inventory vs crafting)
+                try:
+                    scaled_texture = pygame.transform.smoothscale(texture, (item_size, item_size))
+                    game_state.screen.blit(scaled_texture, item_rect.topleft)
+                except pygame.error as e:
+                    print(f"Error scaling texture for item {item_id} in inventory: {e}")
+                    # Fallback drawing if scaling fails
+                    item_color = constants.ITEM_COLORS.get(item_name, constants.GRAY)
+                    pygame.draw.rect(game_state.screen, item_color, item_rect, border_radius=3)
+            else:
+                # Fallback: Draw colored square if no texture
+                item_color = constants.ITEM_COLORS.get(item_name, constants.GRAY) # Use ITEM_COLORS
+                pygame.draw.rect(game_state.screen, item_color, item_rect, border_radius=3)
+
+            # Draw border over the texture/color
             pygame.draw.rect(game_state.screen, constants.BLACK, item_rect, 1, border_radius=3) # Border
 
-            # --- REMOVED: Draw item name and count below ---
-            # if game_state.small_button_font:
-            #     item_text = f"{item_name}: {count}"
-            #     text_surf = game_state.small_button_font.render(item_text, True, constants.BLACK) # Black text
-            #     text_rect = text_surf.get_rect(midtop=(x + item_size // 2, y + item_size + 2))
-            #     game_state.screen.blit(text_surf, text_rect)
+            # --- Draw Quantity (on top of texture/color, bottom right) ---
+            if count > 1 and game_state.small_button_font:
+                qty_surf = game_state.small_button_font.render(str(count), True, constants.BLACK)
+                qty_rect = qty_surf.get_rect(bottomright=(item_rect.right - 2, item_rect.bottom - 1))
+                # Optional: Draw a small contrasting background behind quantity text
+                bg_rect = qty_rect.inflate(4, 1)
+                bg_surf = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+                bg_surf.fill((*constants.WHITE, 180)) # Semi-transparent white
+                game_state.screen.blit(bg_surf, bg_rect.topleft)
+                game_state.screen.blit(qty_surf, qty_rect)
+
 
             col += 1
             if col >= items_per_row:
@@ -616,8 +638,8 @@ def _draw_crafting_elements(mouse_pos):
                     if r < len(game_state.crafting_grid) and c < len(game_state.crafting_grid[r]):
                         item_stack = game_state.crafting_grid[r][c]
                         if item_stack:
-                            # Draw item representation WITHOUT quantity
-                            _draw_item_stack(item_stack, rect, draw_quantity=False)
+                            # Draw item representation WITH quantity
+                            _draw_item_stack(item_stack, rect, draw_quantity=True)
                             # Check for hover
                             if rect.collidepoint(mouse_pos):
                                 hover_text = f"{item_stack.name}: {item_stack.quantity}"
@@ -647,11 +669,11 @@ def _draw_crafting_elements(mouse_pos):
         # Draw result item
         item_stack = game_state.crafting_result_slot
         if item_stack:
-            # Draw item representation WITHOUT quantity
-            _draw_item_stack(item_stack, rect, draw_quantity=False)
+            # Draw item representation WITH quantity
+            _draw_item_stack(item_stack, rect, draw_quantity=True)
             # Check for hover
             if rect.collidepoint(mouse_pos):
-                hover_text = f"{item_stack.name}: {item_stack.quantity} (Result)"
+                hover_text = f"{item_stack.name}: {item_stack.quantity} (Click to craft)" # Updated tooltip
 
     # --- Draw Inventory Slots ---
     for inv_slot_info in game_state.inventory_display_rects:
@@ -662,10 +684,10 @@ def _draw_crafting_elements(mouse_pos):
             pygame.draw.rect(game_state.screen, constants.GRAY, rect, border_radius=3) # Background
             pygame.draw.rect(game_state.screen, constants.BLACK, rect, width=1, border_radius=3) # Border
             try:
-                # Create temporary ItemStack to draw (just for name/color lookup)
+                # Create temporary ItemStack to draw (just for name/texture lookup)
                 item_stack = game_state.ItemStack(item_id, quantity)
-                # Draw item representation WITHOUT quantity
-                _draw_item_stack(item_stack, rect, draw_quantity=False)
+                # Draw item representation WITH quantity
+                _draw_item_stack(item_stack, rect, draw_quantity=True)
                 # Check for hover
                 if rect.collidepoint(mouse_pos):
                     hover_text = f"{item_stack.name}: {item_stack.quantity}"
@@ -678,7 +700,7 @@ def _draw_crafting_elements(mouse_pos):
     if game_state.held_item:
         # Center the item rect on the mouse cursor
         # Use GRID_SLOT_SIZE for consistency, maybe slightly smaller
-        held_item_size = GRID_SLOT_SIZE * 0.9
+        held_item_size = GRID_SLOT_SIZE # Keep same size as slots
         item_rect = pygame.Rect(0, 0, held_item_size, held_item_size)
         item_rect.center = mouse_pos
         # Draw the item stack representation (includes background/item/qty)
@@ -689,58 +711,67 @@ def _draw_crafting_elements(mouse_pos):
     return hover_text # Return the text for the tooltip, if any
 
 
-# Modified _draw_item_stack to optionally draw quantity
+# Modified _draw_item_stack to optionally draw quantity and use textures
 def _draw_item_stack(item_stack, rect, draw_background=False, draw_quantity=True):
-    """Helper to draw an ItemStack within a given rect. Can optionally draw quantity."""
+    """Helper to draw an ItemStack (texture or fallback) within a given rect."""
     if not item_stack or not rect or not game_state.screen: return
 
     try:
-        inner_rect = rect.inflate(-4, -4) # Leave space for border
+        inner_rect = rect.inflate(-4, -4) # Leave space for border/padding
 
         # Draw background color square (optional, useful for held item)
         if draw_background:
-             item_color = constants.ITEM_COLORS.get(item_stack.name, constants.LIGHT_GRAY) # Use light gray fallback
              # Draw slightly smaller than the rect to fit inside borders or appear distinct
              bg_inner_rect = rect.inflate(-2, -2)
              # Optional: Add alpha for transparency
              surf = pygame.Surface(bg_inner_rect.size, pygame.SRCALPHA)
-             surf.fill((*item_color, 200)) # Add alpha channel (0-255)
+             # Use a neutral background color for held item
+             surf.fill((*constants.LIGHT_GRAY, 200)) # Add alpha channel (0-255)
              game_state.screen.blit(surf, bg_inner_rect.topleft)
-             # pygame.draw.rect(game_state.screen, item_color, inner_rect, border_radius=3)
+
+        # --- Draw Item Texture ---
+        texture = game_state.item_textures.get(item_stack.item_id)
+        if texture:
+            # Scale texture to fit the inner_rect size
+            try:
+                # Use smoothscale for better quality if performance allows
+                scaled_texture = pygame.transform.smoothscale(texture, inner_rect.size)
+                game_state.screen.blit(scaled_texture, inner_rect.topleft)
+            except pygame.error as e:
+                print(f"Error scaling texture for item {item_stack.item_id}: {e}")
+                # Fallback drawing if scaling fails
+                item_color = constants.ITEM_COLORS.get(item_stack.name, constants.GRAY)
+                pygame.draw.rect(game_state.screen, item_color, inner_rect, border_radius=2)
         else:
-            # If not drawing specific background, draw item color directly in slot
+            # Fallback: Draw item color directly in slot if no texture
             item_color = constants.ITEM_COLORS.get(item_stack.name, constants.GRAY)
             pygame.draw.rect(game_state.screen, item_color, inner_rect, border_radius=2)
+            # Optional: Draw placeholder text if no texture
+            item_font = game_state.small_button_font
+            if item_font:
+                item_text = item_stack.name[0] if item_stack.name else "?"
+                text_surf = item_font.render(item_text, True, constants.BLACK)
+                text_rect = text_surf.get_rect(center=inner_rect.center)
+                game_state.screen.blit(text_surf, text_rect)
 
-
-        # Draw item name (abbreviated or initial) - Placeholder / Simple Text
-        # Use a smaller font for item text within slots
-        item_font = game_state.small_button_font
-        if item_font:
-            # Simple text representation for now (e.g., first 4 chars)
-            # item_text = item_stack.name[:4]
-            # Or maybe just the first letter?
-            item_text = item_stack.name[0] if item_stack.name else "?"
-            text_surf = item_font.render(item_text, True, constants.BLACK)
-            # Center the text within the inner rect
-            text_rect = text_surf.get_rect(center=inner_rect.center)
-            game_state.screen.blit(text_surf, text_rect)
 
         # Draw quantity (bottom right) if > 1 AND if requested
-        if draw_quantity and item_stack.quantity > 1 and item_font:
-            qty_surf = item_font.render(str(item_stack.quantity), True, constants.BLACK)
-            # Position at bottom right of the main rect
-            qty_rect = qty_surf.get_rect(bottomright=(rect.right - 3, rect.bottom - 1))
-            # Optional: Draw a small contrasting background behind quantity text
-            bg_rect = qty_rect.inflate(4, 1)
-            bg_surf = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
-            bg_surf.fill((*constants.WHITE, 180)) # Semi-transparent white
-            game_state.screen.blit(bg_surf, bg_rect.topleft)
+        if draw_quantity and item_stack.quantity > 1:
+            qty_font = game_state.small_button_font # Or a dedicated smaller font
+            if qty_font:
+                qty_surf = qty_font.render(str(item_stack.quantity), True, constants.BLACK)
+                # Position at bottom right of the main rect
+                qty_rect = qty_surf.get_rect(bottomright=(rect.right - 3, rect.bottom - 1))
+                # Optional: Draw a small contrasting background behind quantity text
+                bg_rect = qty_rect.inflate(4, 1)
+                bg_surf = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+                bg_surf.fill((*constants.WHITE, 180)) # Semi-transparent white
+                game_state.screen.blit(bg_surf, bg_rect.topleft)
 
-            game_state.screen.blit(qty_surf, qty_rect)
+                game_state.screen.blit(qty_surf, qty_rect)
 
     except Exception as e:
-        print(f"Error drawing item stack for {item_stack.name}: {e}")
+        print(f"Error drawing item stack for {item_stack.name} (ID: {item_stack.item_id}): {e}")
         # Optionally draw an error symbol in the rect
         if game_state.text_font:
              err_surf = game_state.text_font.render("!", True, (255,0,0))

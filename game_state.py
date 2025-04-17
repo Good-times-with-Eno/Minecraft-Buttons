@@ -1,6 +1,15 @@
 import pygame
 import constants # Import constants for initial state if needed
 
+# --- Core Game Data Dictionaries ---
+# These will be populated by data_loader and game_logic functions
+
+item_data = {}      # Stores details about each item {item_id: {'name': '...', 'mine_time': ...}}
+mine_list = {}      # Stores mineable blocks and their properties {block_id: {'name': '...', 'mine_time': ...}}
+item_textures = {}  # Stores loaded and resized item textures {item_id: pygame.Surface}
+recipes = {}        # Stores crafting recipes {output_item_id: {'ingredients': {...}, 'quantity': ...}}
+inventory = {}      # Stores the player's current inventory {item_id: quantity}
+
 # --- Pygame Specific ---
 screen = None
 fullscreen = False
@@ -24,7 +33,6 @@ CRAFTING_GRID_SIZE = 2 # 2x2 grid
 crafting_grid = [[None for _ in range(CRAFTING_GRID_SIZE)] for _ in range(CRAFTING_GRID_SIZE)] # Holds ItemStacks or None
 crafting_result_slot = None # Holds the resulting ItemStack or None
 held_item = None # Holds the ItemStack being dragged by the mouse, or None
-# ---
 
 # --- Dynamic UI Elements ---
 # ... (fonts, UI elements remain the same) ...
