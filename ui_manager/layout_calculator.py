@@ -33,6 +33,7 @@ def update_layout(width, height):
 
     # --- Select World Screen Buttons ---
     if game_state.current_screen == constants.SELECT_WORLD:
+        # ... (Select World layout remains the same) ...
         game_state.status_message = "Select a World to Load or Start"
         num_slots = constants.MAX_SAVE_SLOTS
         button_width = int(width * 0.6)
@@ -56,7 +57,9 @@ def update_layout(width, height):
             start_y += button_height + spacing_unit
 
         quit_rect = pygame.Rect(button_x, start_y, button_width, button_height)
-        add_button(quit_rect, "Quit", "quit_game", font=game_state.button_font)
+        # This Quit button remains, it quits the whole application from the select screen
+        add_button(quit_rect, "Quit Game", "quit_game", font=game_state.button_font)
+
 
     # --- Main Menu Buttons ---
     elif game_state.current_screen == constants.MAIN_MENU:
@@ -64,7 +67,8 @@ def update_layout(width, height):
             ("Mine", "goto_mining"),
             ("Craft", "goto_crafting"),
             ("Show inventory", "goto_inventory"),
-            ("Quit", "quit_game")
+            # ("Quit", "quit_game") # <-- OLD
+            ("Save and Exit to Menu", "save_and_exit_to_select") # <-- NEW Text and Action
         ]
         num_buttons = len(button_texts)
         button_width = int(width * 0.6)
@@ -85,6 +89,7 @@ def update_layout(width, height):
 
     # --- Mining Menu Buttons ---
     elif game_state.current_screen == constants.MINING_MENU:
+        # ... (Mining Menu layout remains the same) ...
         game_state.status_message = "Select a block to mine:"
         button_width = int(width * 0.7)
         button_height = int(height * 0.06)
@@ -107,6 +112,7 @@ def update_layout(width, height):
 
     # --- Ask Quantity Screen ---
     elif game_state.current_screen == constants.ASK_QUANTITY:
+        # ... (Ask Quantity layout remains the same) ...
         prompt_text = f"How many {game_state.mine_list.get(game_state.selected_block_for_mining, 'Unknown')}? (1-64)"
         if "Invalid quantity" not in game_state.status_message and "Please enter" not in game_state.status_message:
              game_state.status_message = prompt_text
@@ -119,7 +125,7 @@ def update_layout(width, height):
         start_x = center_x - total_width_needed // 2
         input_field_width = int(width * 0.5)
         input_field_x = start_x
-        input_field_y = prompt_y + status_bar_height + spacing_unit
+        input_field_y = prompt_y + status_bar_height + spacing_unit # Adjusted y position based on status bar
         game_state.input_field_rect = pygame.Rect(input_field_x, input_field_y, input_field_width, input_field_height)
 
         ok_button_x = game_state.input_field_rect.right + spacing_unit
@@ -134,8 +140,10 @@ def update_layout(width, height):
         back_rect = pygame.Rect(button_x, button_y, button_width, button_height)
         add_button(back_rect, "Back", "goto_mining", font=game_state.button_font)
 
+
     # --- Inventory & Crafting Screens ---
     elif game_state.current_screen in [constants.INVENTORY_SCREEN, constants.CRAFTING_SCREEN]:
+        # ... (Inventory/Crafting layout remains the same) ...
         button_width = int(width * 0.4)
         button_height = max(int(height*0.05), int(height * 0.08))
         button_x = center_x - button_width // 2
@@ -145,6 +153,7 @@ def update_layout(width, height):
 
     # --- Error State Screen ---
     elif game_state.current_screen == constants.ERROR_STATE:
+        # ... (Error State layout remains the same) ...
         button_width = int(width * 0.4)
         button_height = max(int(height*0.05), int(height * 0.08))
         button_x = center_x - button_width // 2
@@ -155,3 +164,4 @@ def update_layout(width, height):
     # --- Mining In Progress Screen ---
     elif game_state.current_screen == constants.MINING_INPROGRESS:
         pass # No buttons or specific layout calculations needed here beyond the default
+
