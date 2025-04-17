@@ -1,4 +1,3 @@
-# /Users/newenoch/Documents/Visual Studio Code/Minecraft (Buttons)/1.0.1-beta/main.py
 import pygame
 import sys
 import constants

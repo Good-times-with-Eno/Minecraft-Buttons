@@ -20,10 +20,12 @@ DARK_GREEN = (0, 100, 0) # For mining progress, status messages
 SLOT_EMPTY_COLOR = (150, 150, 150) # Color for empty slot buttons
 SLOT_EXISTS_COLOR = (180, 220, 180) # Color for existing slot buttons
 
+
 # --- Configuration ---
 INITIAL_SCREEN_WIDTH = 800
 INITIAL_SCREEN_HEIGHT = 600
 FPS_LIMIT = 45 # Define FPS limit as a constant
+DEFAULT_MINING_TIME = 5.0 # Default time in seconds if specific speed is missing
 CURSOR_BLINK_RATE = 500 # Milliseconds for cursor blink cycle (on/off)
 MAX_SAVE_SLOTS = 5 # Define the number of save slots
 

@@ -1,4 +1,3 @@
-# /Users/newenoch/Documents/Visual Studio Code/Minecraft (Buttons)/1.0.1-beta/game_state.py
 import pygame
 import constants # Import constants for initial state if needed
 
@@ -18,6 +17,7 @@ mine_list = {0: "Back"} # Use 0 for Back consistently
 inventory = {} # Inventory will be loaded/reset per world
 tool_headers = [] # Stores tool names from the header
 item_name_to_id = {} # Added: Map item names back to IDs {name: id}
+item_id_to_name = {} # *** ADDED: Map item IDs back to names {id: name} ***
 
 # --- Crafting State --- Added Section
 CRAFTING_GRID_SIZE = 2 # 2x2 grid
@@ -27,14 +27,12 @@ held_item = None # Holds the ItemStack being dragged by the mouse, or None
 # ---
 
 # --- Dynamic UI Elements ---
-# Fonts (initialized in ui_manager)
+# ... (fonts, UI elements remain the same) ...
 title_font = None
 button_font = None
 small_button_font = None
 text_font = None
 copyright_font = None
-
-# UI element surfaces/rects (managed by ui_manager)
 title_text_surf = None
 title_rect = None
 copyright_surf = None
@@ -42,20 +40,20 @@ copyright_rect = None
 buttons = [] # Holds currently active buttons
 input_field_rect = None # Rectangle for the quantity input field
 accumulated_input = "" # For quantity input
-
-# --- Crafting UI Rects --- Added Section
 crafting_grid_rects = [[None for _ in range(CRAFTING_GRID_SIZE)] for _ in range(CRAFTING_GRID_SIZE)] # Rects for grid slots
 crafting_result_rect = None # Rect for the result slot
 inventory_display_rects = [] # Rects for showing inventory items on crafting screen
-# ---
+
 
 # --- Status & Mining ---
+# ... (status, mining variables remain the same) ...
 status_message = "" # For displaying info like "Mined X blocks" or errors
 selected_block_for_mining = None
 mining_quantity = 0
 mining_start_time = 0
 mining_duration = 0
 mining_progress_text = ""
+
 
 # --- Item Representation Class --- Added Class
 # (Could be in game_logic.py or its own file too)
@@ -69,13 +67,13 @@ class ItemStack:
 
         self.item_id = item_id
         self.quantity = quantity
-        # Cache name lookup
-        self.name = mine_list.get(item_id, "Unknown")
+        # *** FIX: Use item_id_to_name map for name lookup ***
+        self.name = item_id_to_name.get(item_id, f"ID:{item_id}") # Fallback to ID if name not found
 
     def get_name(self) -> str:
         """Returns the item name."""
-        # Refresh name if mine_list could somehow change (unlikely here)
-        # self.name = game_state.mine_list.get(self.item_id, "Unknown")
+        # Refresh name if map could change (unlikely here unless data reloaded)
+        # self.name = item_id_to_name.get(self.item_id, f"ID:{self.item_id}")
         return self.name
 
     def __repr__(self) -> str:

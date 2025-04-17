@@ -1,4 +1,3 @@
-# /Users/newenoch/Documents/Visual Studio Code/Minecraft (Buttons)/1.0.1-beta/event_handler.py
 import pygame
 import sys
 import game_state

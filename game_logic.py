@@ -1,8 +1,8 @@
-# /Users/newenoch/Documents/Visual Studio Code/Minecraft (Buttons)/1.0.1-beta/game_logic.py
 import pygame
 import time
 import game_state
 import constants
+import mine_speeds
 # Correct import path for display_manager inside ui_manager folder
 # Assuming main.py is in 1.0.1-beta/ and ui_manager is a subfolder
 from ui_manager import display_manager # Adjusted import
@@ -83,26 +83,82 @@ def initialize_recipes():
 
 # --- Mining Logic ---
 # (Keep existing start_mining and calculate_mining_time functions)
+# In game_logic.py
+
+# --- (Keep other imports and functions like initialize_recipes, start_mining, etc.) ---
+
 def calculate_mining_time(block_id):
-    """Calculates mining time based on block hardness and tool."""
+    """
+    Calculates mining time based on block data and the currently equipped tool.
+    Assumes game_state.equipped_tool_name and game_state.tool_stats are populated.
+    """
     block_name = game_state.mine_list.get(block_id)
     if not block_name:
         print(f"Warning: Unknown block ID {block_id} requested for mining time.")
-        return constants.DEFAULT_MINING_TIME # Default time
+        # Use the constant we added
+        return constants.DEFAULT_MINING_TIME
 
     block_data = game_state.mine_speeds.get(block_name)
     if not block_data:
         print(f"Warning: No mining data found for block '{block_name}'.")
-        return constants.DEFAULT_MINING_TIME # Default time
+        return constants.DEFAULT_MINING_TIME
 
-    # Simplification: Using default speed for now. Tool logic can be added later.
-    speed = block_data["speeds"].get("default", constants.DEFAULT_MINING_TIME)
-    if speed is None: # Handle blocks not breakable by default (like with shears/sword only)
-        print(f"Warning: Block '{block_name}' has no default mining speed.")
-        return constants.DEFAULT_MINING_TIME * 2 # Make it take longer as a fallback
+    speeds = block_data.get("speeds", {})
+    required_tool_type = block_data.get("tool") # e.g., "axe", "pickaxe", None
+    default_speed = speeds.get("default") # Get the block's specific default speed
 
-    # Pygame time is in milliseconds, speeds are often in seconds
-    return speed # Assuming speed is already in seconds
+    # Fallback if the block's default speed is missing for some reason
+    if default_speed is None:
+        print(f"Warning: Block '{block_name}' is missing a 'default' speed in mine_speeds.py. Using global default.")
+        default_speed = constants.DEFAULT_MINING_TIME
+
+    # --- Tool Logic ---
+    final_speed = default_speed # Start with the block's default speed
+    equipped_tool_name = getattr(game_state, 'equipped_tool_name', None) # Safely get equipped tool name
+    tool_stats_data = getattr(game_state, 'tool_stats', {}) # Safely get tool stats
+
+    if equipped_tool_name and tool_stats_data:
+        tool_info = tool_stats_data.get(equipped_tool_name)
+        if tool_info:
+            equipped_tool_type = tool_info.get("type")
+            equipped_tool_tier = tool_info.get("tier") # e.g., "wooden", "stone"
+
+            # Check if the equipped tool is the correct type for the block
+            if equipped_tool_type == required_tool_type:
+                # Get the speed for this specific tool tier
+                tier_speed = speeds.get(equipped_tool_tier)
+
+                if tier_speed is not None:
+                    # Use the specific tool tier speed if defined
+                    final_speed = tier_speed
+                    print(f"Using {equipped_tool_tier} {equipped_tool_type} speed for {block_name}: {final_speed}s") # Debug
+                else: # If tier_speed is None, it means this tool tier can't break it efficiently or at all
+                    # We already initialized final_speed to default_speed, so we keep that.
+                    print(f"Tool tier '{equipped_tool_tier}' not listed for {block_name}, using default speed: {final_speed}s") # Debug
+
+            else: #Tool type is wrong, use the default speed (already set)
+                print(f"Equipped tool type '{equipped_tool_type}' is wrong for {block_name} (needs '{required_tool_type}'). Using default speed: {final_speed}s") # Debug
+
+        else: #Equipped tool name exists, but no stats found (shouldn't happen if loaded correctly)
+            print(f"Warning: Stats not found for equipped tool '{equipped_tool_name}'. Using default speed.") # Debug
+
+    else: #No tool equipped or tool stats not loaded
+        print(f"No tool equipped or stats unavailable. Using default speed for {block_name}: {final_speed}s") # Debug
+
+
+    # Handle cases where the calculated speed might still be None (e.g., shears/sword only blocks with no default)
+    if final_speed is None:
+         print(f"Warning: Could not determine a valid mining speed for {block_name} even with defaults. Using fallback.")
+         # Use the global default * 2 as a penalty/indicator
+         final_speed = constants.DEFAULT_MINING_TIME * 2
+
+    # Ensure speed is positive
+    if final_speed <= 0:
+        print(f"Warning: Calculated mining speed for {block_name} is zero or negative ({final_speed}). Setting to a small positive value.")
+        final_speed = 0.1 # Set a minimum time
+
+    return final_speed # Speed in seconds
+
 
 def start_mining(block_id, quantity):
     """Initiates the mining process for a selected block and quantity."""
