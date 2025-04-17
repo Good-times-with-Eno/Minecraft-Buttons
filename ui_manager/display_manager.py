@@ -721,38 +721,60 @@ def _draw_item_stack(item_stack, rect, draw_background=False, draw_quantity=True
 
         # Draw background color square (optional, useful for held item)
         if draw_background:
-             # Draw slightly smaller than the rect to fit inside borders or appear distinct
              bg_inner_rect = rect.inflate(-2, -2)
-             # Optional: Add alpha for transparency
              surf = pygame.Surface(bg_inner_rect.size, pygame.SRCALPHA)
-             # Use a neutral background color for held item
-             surf.fill((*constants.LIGHT_GRAY, 200)) # Add alpha channel (0-255)
+             surf.fill((*constants.LIGHT_GRAY, 200))
              game_state.screen.blit(surf, bg_inner_rect.topleft)
 
         # --- Draw Item Texture ---
         texture = game_state.item_textures.get(item_stack.item_id)
         if texture:
-            # Scale texture to fit the inner_rect size
             try:
-                # Use smoothscale for better quality if performance allows
                 scaled_texture = pygame.transform.smoothscale(texture, inner_rect.size)
                 game_state.screen.blit(scaled_texture, inner_rect.topleft)
             except pygame.error as e:
                 print(f"Error scaling texture for item {item_stack.item_id}: {e}")
-                # Fallback drawing if scaling fails
                 item_color = constants.ITEM_COLORS.get(item_stack.name, constants.GRAY)
                 pygame.draw.rect(game_state.screen, item_color, inner_rect, border_radius=2)
         else:
             # Fallback: Draw item color directly in slot if no texture
             item_color = constants.ITEM_COLORS.get(item_stack.name, constants.GRAY)
             pygame.draw.rect(game_state.screen, item_color, inner_rect, border_radius=2)
-            # Optional: Draw placeholder text if no texture
             item_font = game_state.small_button_font
             if item_font:
                 item_text = item_stack.name[0] if item_stack.name else "?"
                 text_surf = item_font.render(item_text, True, constants.BLACK)
                 text_rect = text_surf.get_rect(center=inner_rect.center)
                 game_state.screen.blit(text_surf, text_rect)
+
+
+        # Draw quantity (bottom right) if > 1 AND if requested
+        if draw_quantity and item_stack.quantity > 1:
+            qty_font = game_state.small_button_font # Or a dedicated smaller font
+            if qty_font:
+                # Render the quantity text (keeping this)
+                qty_surf = qty_font.render(str(item_stack.quantity), True, constants.BLACK)
+                # Position at bottom right of the main rect (keeping this)
+                qty_rect = qty_surf.get_rect(bottomright=(rect.right - 3, rect.bottom - 1))
+
+                # --- REMOVED BACKGROUND DRAWING ---
+                # bg_rect = qty_rect.inflate(4, 1)
+                # bg_surf = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+                # bg_surf.fill((*constants.WHITE, 180)) # Semi-transparent white
+                # game_state.screen.blit(bg_surf, bg_rect.topleft)
+                # --- END REMOVED BACKGROUND DRAWING ---
+
+                # Draw just the quantity text surface (keeping this)
+                game_state.screen.blit(qty_surf, qty_rect)
+
+    except Exception as e:
+        print(f"Error drawing item stack for {item_stack.name} (ID: {item_stack.item_id}): {e}")
+        if game_state.text_font:
+             err_surf = game_state.text_font.render("!", True, (255,0,0))
+             err_rect = err_surf.get_rect(center=rect.center)
+             pygame.draw.rect(game_state.screen, constants.GRAY, rect) # Clear slot
+             game_state.screen.blit(err_surf, err_rect)
+
 
 
         # Draw quantity (bottom right) if > 1 AND if requested
