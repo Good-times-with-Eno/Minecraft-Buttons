@@ -1,10 +1,11 @@
+# /Users/newenoch/Documents/Visual Studio Code/Minecraft (Buttons)/1.0.1/game_logic.py
 import pygame
 import time
 import game_state
 import constants
 import mine_speeds
 # Correct import path for display_manager inside ui_manager folder
-# Assuming main.py is in 1.0.1-beta/ and ui_manager is a subfolder
+# Assuming main.py is in 1.0.1/ and ui_manager is a subfolder
 from ui_manager import display_manager # Adjusted import
 
 # --- Recipe Data ---
@@ -82,29 +83,36 @@ def initialize_recipes():
 
 
 # --- Mining Logic ---
-# (Keep existing start_mining and calculate_mining_time functions)
-# In game_logic.py
-
-# --- (Keep other imports and functions like initialize_recipes, start_mining, etc.) ---
 
 def calculate_mining_time(block_id):
     """
     Calculates mining time based on block data and the currently equipped tool.
     Assumes game_state.equipped_tool_name and game_state.tool_stats are populated.
     """
-    block_name = game_state.mine_list.get(block_id)
+    # Use item_id_to_name for lookup now
+    block_name = game_state.item_id_to_name.get(block_id)
     if not block_name:
         print(f"Warning: Unknown block ID {block_id} requested for mining time.")
-        # Use the constant we added
         return constants.DEFAULT_MINING_TIME
 
-    block_data = game_state.mine_speeds.get(block_name)
+    # Use item_data which is keyed by ID
+    block_data = game_state.item_data.get(block_id)
     if not block_data:
-        print(f"Warning: No mining data found for block '{block_name}'.")
+        print(f"Warning: No mining data found for block '{block_name}' (ID: {block_id}).")
         return constants.DEFAULT_MINING_TIME
 
-    speeds = block_data.get("speeds", {})
-    required_tool_type = block_data.get("tool") # e.g., "axe", "pickaxe", None
+    # Get base time from item_data (assuming it's stored there now)
+    # Need to adjust this based on how mine_speeds.py data is stored in item_data
+    # For now, let's assume 'mine_time' exists in item_data[block_id]
+    # OR we still need to access mine_speeds using the name
+    # Let's revert to using mine_speeds for the detailed speed info for now
+    mine_speed_data = game_state.mine_speeds.get(block_name)
+    if not mine_speed_data:
+         print(f"Warning: No detailed speed data in game_state.mine_speeds for '{block_name}'. Using default.")
+         return constants.DEFAULT_MINING_TIME
+
+    speeds = mine_speed_data.get("speeds", {})
+    required_tool_type = mine_speed_data.get("tool") # e.g., "axe", "pickaxe", None
     default_speed = speeds.get("default") # Get the block's specific default speed
 
     # Fallback if the block's default speed is missing for some reason
@@ -131,19 +139,22 @@ def calculate_mining_time(block_id):
                 if tier_speed is not None:
                     # Use the specific tool tier speed if defined
                     final_speed = tier_speed
-                    print(f"Using {equipped_tool_tier} {equipped_tool_type} speed for {block_name}: {final_speed}s") # Debug
+                    # print(f"Using {equipped_tool_tier} {equipped_tool_type} speed for {block_name}: {final_speed}s") # Debug
                 else: # If tier_speed is None, it means this tool tier can't break it efficiently or at all
                     # We already initialized final_speed to default_speed, so we keep that.
-                    print(f"Tool tier '{equipped_tool_tier}' not listed for {block_name}, using default speed: {final_speed}s") # Debug
+                    # print(f"Tool tier '{equipped_tool_tier}' not listed for {block_name}, using default speed: {final_speed}s") # Debug
+                    pass # Keep default speed
 
             else: #Tool type is wrong, use the default speed (already set)
-                print(f"Equipped tool type '{equipped_tool_type}' is wrong for {block_name} (needs '{required_tool_type}'). Using default speed: {final_speed}s") # Debug
+                # print(f"Equipped tool type '{equipped_tool_type}' is wrong for {block_name} (needs '{required_tool_type}'). Using default speed: {final_speed}s") # Debug
+                pass # Keep default speed
 
         else: #Equipped tool name exists, but no stats found (shouldn't happen if loaded correctly)
             print(f"Warning: Stats not found for equipped tool '{equipped_tool_name}'. Using default speed.") # Debug
 
     else: #No tool equipped or tool stats not loaded
-        print(f"No tool equipped or stats unavailable. Using default speed for {block_name}: {final_speed}s") # Debug
+        # print(f"No tool equipped or stats unavailable. Using default speed for {block_name}: {final_speed}s") # Debug
+        pass # Keep default speed
 
 
     # Handle cases where the calculated speed might still be None (e.g., shears/sword only blocks with no default)
@@ -166,8 +177,9 @@ def start_mining(block_id, quantity):
         game_state.status_message = f"Invalid quantity: {quantity}. Must be 1-64."
         return False
 
-    block_name = game_state.mine_list.get(block_id)
-    if not block_name or block_id == 0: # Ensure it's not "Back"
+    # Use item_id_to_name for lookup
+    block_name = game_state.item_id_to_name.get(block_id)
+    if not block_name or block_id == 0: # Ensure it's not "Back" and ID is valid
         game_state.status_message = "Invalid block selected."
         return False
 
@@ -198,8 +210,8 @@ def start_mining(block_id, quantity):
         return False
 
 
-# --- Inventory Management
-    
+# --- Inventory Management ---
+
 def find_first_empty_slot():
     """Finds the index of the first empty (None) slot in the inventory."""
     for i, slot in enumerate(game_state.inventory):
@@ -214,7 +226,8 @@ def add_items_to_inventory(item_id: int, quantity: int) -> int:
         return 0 #Nothing to add
     remaining_quantity = quantity
     item_name = game_state.item_id_to_name.get(item_id, f"ID:{item_id}")
-    print(f"Attempting to add {quantity} x {item_name} (ID: {item_id}) to inventory.")
+    # print(f"Attempting to add {quantity} x {item_name} (ID: {item_id}) to inventory.") # Less verbose
+
     # --- Phase 1: Add to existing, non-full stacks ---
     for i, stack in enumerate(game_state.inventory):
         if remaining_quantity <= 0: break # All items placed
@@ -224,23 +237,25 @@ def add_items_to_inventory(item_id: int, quantity: int) -> int:
             if can_add_now > 0:
                 added_now = stack.add(can_add_now)
                 remaining_quantity -= added_now
-                print(f"  Added {added_now} to existing stack in slot {i}. Remaining: {remaining_quantity}")
+                # print(f"  Added {added_now} to existing stack in slot {i}. Remaining: {remaining_quantity}") # Less verbose
 
     # --- Phase 2: Add to new stacks in empty slots ---
     while remaining_quantity > 0:
         empty_slot_index = find_first_empty_slot()
         if empty_slot_index == -1:
-            print(f"  Inventory full. Could not add remaining {remaining_quantity} items.")
+            # print(f"  Inventory full. Could not add remaining {remaining_quantity} items.") # Less verbose
             break # No empty slots left
 
         # Determine quantity for the new stack
-        qty_for_new_stack = min(remaining_quantity, game_state.ItemStack.DEFAULT_MAX_STACK) # Use item-specific max later if needed
+        # TODO: Use item-specific max stack size from item_data if available
+        max_stack_for_item = game_state.ItemStack.DEFAULT_MAX_STACK # Default for now
+        qty_for_new_stack = min(remaining_quantity, max_stack_for_item)
 
         try:
             new_stack = game_state.ItemStack(item_id, qty_for_new_stack)
             game_state.inventory[empty_slot_index] = new_stack
             remaining_quantity -= qty_for_new_stack
-            print(f"  Created new stack with {qty_for_new_stack} in slot {empty_slot_index}. Remaining: {remaining_quantity}")
+            # print(f"  Created new stack with {qty_for_new_stack} in slot {empty_slot_index}. Remaining: {remaining_quantity}") # Less verbose
         except ValueError as e:
             print(f"Error creating ItemStack for inventory: {e}")
             # Prevent infinite loop if ItemStack creation fails
@@ -255,23 +270,16 @@ def add_items_to_inventory(item_id: int, quantity: int) -> int:
 
     return remaining_quantity # Return amount that couldn't be added
 
-# --- (Keep Crafting Logic: _get_grid_as_pattern, _get_grid_ingredients_list, etc.) ---
-# Note: Crafting logic (find_matching_recipe, update_crafting_result,
-# calculate_max_crafts, consume_crafting_ingredients) primarily works with
-# the crafting_grid, which already uses ItemStacks, so they might not need
-# major changes *yet*. However, how items are *taken* from the result slot
-# and *placed* into the grid/inventory will need updates in event_handler.py.
 
-# --- Crafting Logic ---
+
+# --- Crafting Logic Helpers ---
 
 def _get_grid_as_pattern(grid):
     """Converts the crafting grid ItemStacks into a tuple of tuples of item IDs (or None)."""
     pattern = []
-    # Access CRAFTING_GRID_SIZE via game_state
     grid_size = game_state.CRAFTING_GRID_SIZE
     for r in range(grid_size):
         row_pattern = []
-        # Ensure the row exists and has the expected number of columns
         current_row = grid[r] if r < len(grid) else [None] * grid_size
         for c in range(grid_size):
             stack = current_row[c] if c < len(current_row) else None
@@ -285,7 +293,6 @@ def _get_grid_ingredients_list(grid):
     summing quantities for the same item ID. Used for shapeless checks.
     """
     counts = {}
-    # Access CRAFTING_GRID_SIZE via game_state
     grid_size = game_state.CRAFTING_GRID_SIZE
     for r in range(grid_size):
          current_row = grid[r] if r < len(grid) else []
@@ -297,9 +304,22 @@ def _get_grid_ingredients_list(grid):
     ingredients = [{'item_id': item_id, 'quantity': quantity} for item_id, quantity in counts.items()]
     return ingredients
 
+# <<< FUNCTION ADDED HERE >>>
+def _get_occupied_slot_count(grid):
+    """Counts the number of non-empty slots in the crafting grid."""
+    count = 0
+    grid_size = game_state.CRAFTING_GRID_SIZE
+    for r in range(grid_size):
+        current_row = grid[r] if r < len(grid) else []
+        for c in range(grid_size):
+            stack = current_row[c] if c < len(current_row) else None
+            if stack and isinstance(stack, game_state.ItemStack):
+                count += 1
+    return count
+# <<< END FUNCTION ADDED >>>
 
-# --- Crafting Logic ---
 
+# --- Main Crafting Logic ---
 
 def find_matching_recipe(grid):
     """
@@ -311,6 +331,7 @@ def find_matching_recipe(grid):
 
     grid_pattern = _get_grid_as_pattern(grid)
     grid_ingredients = _get_grid_ingredients_list(grid) # For shapeless check
+    occupied_slot_count = _get_occupied_slot_count(grid) # <<< Get occupied count
 
     # --- Check Shaped Recipes First ---
     for recipe in RECIPES_2x2:
@@ -343,19 +364,28 @@ def find_matching_recipe(grid):
                 req_id = req_item['item_id']
                 req_qty = req_item['quantity']
                 # Check if the required item exists in the grid with AT LEAST the required quantity
-                if grid_item_counts.get(req_id, 0) < req_qty: # Changed from != to <
+                if grid_item_counts.get(req_id, 0) < req_qty:
                     match = False
                     break
-            if match:
-                # Check 3: Does the grid contain ONLY the required items? (Strict shapeless)
-                # If you want recipes like "1 log -> 4 planks" to work even if other
-                # items are in the grid, remove or modify this check.
-                # For now, let's keep it strict: only the required items should be present.
-                if grid_ids == required_ids:
-                    # print(f"Match found (shapeless - >= quantity, exact items): {required_list}") # Debug
-                    return recipe
-                # else:
-                #    print(f"Shapeless candidate found, but extra items in grid: {grid_ids - required_ids}")
+            if not match:
+                continue # Not enough quantity of some item
+
+            # <<< CHANGE START: Add check for number of occupied slots >>>
+            # Check 3: Does the number of occupied slots match the number of ingredients defined?
+            # This prevents using multiple slots for a single ingredient requirement (like 1 log).
+            if occupied_slot_count != len(required_list):
+                # print(f"Shapeless candidate found, but slot count mismatch. Grid slots: {occupied_slot_count}, Recipe ingredients: {len(required_list)}") # Debug
+                continue # Occupied slot count doesn't match recipe structure
+            # <<< CHANGE END >>>
+
+            # Check 4: Does the grid contain ONLY the required items? (Strict shapeless)
+            # This check might be redundant now with the slot count check, but keep for clarity
+            # or if you want recipes that allow extra *types* of items (unlikely).
+            if grid_ids == required_ids:
+                # print(f"Match found (shapeless - >= quantity, exact items, correct slot count): {required_list}") # Debug
+                return recipe
+            # else:
+            #    print(f"Shapeless candidate found, but extra item types in grid: {grid_ids - required_ids}")
 
 
     # print("No matching recipe found.") # Debug
@@ -364,7 +394,6 @@ def find_matching_recipe(grid):
 
 def update_crafting_result():
     """Updates the crafting result slot based on the current grid contents."""
-    # This function remains largely the same - it shows the result for ONE craft.
     matched_recipe = find_matching_recipe(game_state.crafting_grid)
 
     if matched_recipe:
@@ -428,10 +457,18 @@ def calculate_max_crafts(recipe, grid):
             possible_crafts_for_item = available_qty // req_qty_per_craft
             max_crafts = min(max_crafts, possible_crafts_for_item)
 
+    # Ensure the result isn't infinity if no ingredients were required (unlikely)
+    # Also handle the case where the grid might not meet the slot count requirement for shapeless
+    if recipe['type'] == 'shapeless':
+        occupied_slot_count = _get_occupied_slot_count(grid)
+        if occupied_slot_count != len(recipe['ingredients']):
+             # print(f"Max crafts check: Slot count mismatch ({occupied_slot_count} vs {len(recipe['ingredients'])}). Returning 0.") # Debug
+             return 0 # Cannot craft if slot structure is wrong for shapeless
+
     return max_crafts if max_crafts != float('inf') else 0
 
 
-def consume_crafting_ingredients(recipe, multiplier=1): # Added multiplier
+def consume_crafting_ingredients(recipe, multiplier=1):
     """
     Decrements items in the crafting grid based on the matched recipe,
     multiplied by the number of crafts.
@@ -459,23 +496,30 @@ def consume_crafting_ingredients(recipe, multiplier=1): # Added multiplier
                     # Need stack and quantity >= multiplier (since each craft takes 1 from the slot)
                     if not stack or stack.quantity < multiplier:
                         can_consume = False
-                        print(f"Pre-check failed (shaped): Not enough items at grid[{r}][{c}]. Need {multiplier}, have {stack.quantity if stack else 0}.")
+                        # print(f"Pre-check failed (shaped): Not enough items at grid[{r}][{c}]. Need {multiplier}, have {stack.quantity if stack else 0}.") # Debug
                         break
             if not can_consume: break
     elif recipe['type'] == 'shapeless':
-        ingredients_to_consume = recipe['ingredients']
-        grid_counts = {item['item_id']: item['quantity'] for item in _get_grid_ingredients_list(grid)}
-        for req_item in ingredients_to_consume:
-            req_id = req_item['item_id']
-            needed_total = req_item['quantity'] * multiplier
-            available = grid_counts.get(req_id, 0)
-            if available < needed_total:
-                can_consume = False
-                print(f"Pre-check failed (shapeless): Not enough {game_state.mine_list.get(req_id, req_id)}. Need {needed_total}, have {available}.")
-                break
+        # Also check slot count for shapeless pre-check
+        occupied_slot_count = _get_occupied_slot_count(grid)
+        if occupied_slot_count != len(recipe['ingredients']):
+             print(f"Pre-check failed (shapeless): Slot count mismatch ({occupied_slot_count} vs {len(recipe['ingredients'])}).")
+             can_consume = False
+        else:
+            ingredients_to_consume = recipe['ingredients']
+            grid_counts = {item['item_id']: item['quantity'] for item in _get_grid_ingredients_list(grid)}
+            for req_item in ingredients_to_consume:
+                req_id = req_item['item_id']
+                needed_total = req_item['quantity'] * multiplier
+                available = grid_counts.get(req_id, 0)
+                if available < needed_total:
+                    can_consume = False
+                    item_name = game_state.item_id_to_name.get(req_id, f"ID:{req_id}")
+                    # print(f"Pre-check failed (shapeless): Not enough {item_name}. Need {needed_total}, have {available}.") # Debug
+                    break
 
     if not can_consume:
-        print("Consumption aborted due to insufficient ingredients (pre-check).")
+        # print("Consumption aborted due to insufficient ingredients (pre-check).") # Debug
         return False
     # --- End Pre-Check ---
 

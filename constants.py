@@ -59,7 +59,7 @@ ERROR_STATE = 'error_state'
 TEXTURES_DIR = "textures"
 
 # --- UI Constants ---
-ITEM_TEXTURE_SIZE = (32,32) # Size for loading/scaling textures initially
-GRID_SLOT_SIZE = 60 # Increased from 50
-GRID_SPACING = 8   # Adjusted spacing slightly
+ITEM_TEXTURE_SIZE = (48,48) # Size for loading/scaling textures initially
+GRID_SLOT_SIZE = 64 # Increased from 50
+GRID_SPACING = 10   # Adjusted spacing slightly
 
