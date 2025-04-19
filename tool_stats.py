@@ -25,7 +25,7 @@ TOOL_STATS = {
         "display_name": "Wooden Pickaxe",
         "type": "pickaxe",
         "tier": "wooden",
-        "durability": 60, # Standard durability for wooden tools
+        "durability": 59, # Standard durability for wooden tools
         # "attack_damage": 2.0,
         # "attack_speed": 1.2,
         # "enchantability": 15,
@@ -35,7 +35,7 @@ TOOL_STATS = {
         "display_name": "Wooden Axe",
         "type": "axe",
         "tier": "wooden",
-        "durability": 60, # Standard durability for wooden tools
+        "durability": 59, # Standard durability for wooden tools
         # "attack_damage": 7.0, # Axes often have higher base damage but slower speed
         # "attack_speed": 0.8,
         # "enchantability": 15,
