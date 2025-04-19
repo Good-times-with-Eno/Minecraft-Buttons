@@ -12,7 +12,6 @@ KEY_FILENAME_TEMPLATE = "save_{}.key"
 SAVE_DIR = os.path.dirname(__file__) # Save in the same directory as the script
 
 # --- Helper Functions ---
-# ... (_get_save_file_path, _get_key_file_path, get_save_slot_exists remain the same) ...
 def _get_save_file_path(slot_id):
     """Returns the full path for the save file of a given slot."""
     if not (1 <= slot_id <= constants.MAX_SAVE_SLOTS):
@@ -35,7 +34,6 @@ def get_save_slot_exists(slot_id):
     return save_path is not None and os.path.exists(save_path)
 
 # --- Key Management ---
-# ... (_generate_key, _load_key remain the same) ...
 def _generate_key(slot_id):
     """Generates a new encryption key and saves it for the specific slot."""
     key_path = _get_key_file_path(slot_id)
@@ -76,7 +74,6 @@ def _load_key(slot_id):
 
 
 # --- Save/Load Logic ---
-# ... (save_game remains the same) ...
 def save_game(slot_id):
     """Saves the current inventory to an encrypted file for the given slot."""
     if slot_id is None or not (1 <= slot_id <= constants.MAX_SAVE_SLOTS):
@@ -94,19 +91,35 @@ def save_game(slot_id):
     fernet = Fernet(key)
 
     try:
-        # 1. Get the data to save (only inventory for now)
-        # Ensure keys are strings for JSON compatibility
-        inventory_to_save = {str(k): v for k, v in game_state.inventory.items() if isinstance(k, int) and k != 0} # Ensure keys are int and not 0
-        data_string = json.dumps(inventory_to_save)
+        # 1. Prepare inventory data for saving
+        inventory_to_save = []
+        for stack in game_state.inventory:
+            if stack is None:
+                inventory_to_save.append(None)
+            else:
+                # Save as a dictionary {id: ..., qty: ...}
+                inventory_to_save.append({
+                    "item_id": stack.item_id,
+                    "quantity": stack.quantity
+                })
 
-        # 2. Encode to bytes
+        # Include other game state data if needed in the future
+        save_data = {
+            "inventory": inventory_to_save
+            # Add other things like player position, equipped items, etc. here
+        }
+
+        # 2. Serialize to JSON string
+        data_string = json.dumps(save_data)
+
+        # 3. Encode to bytes
         data_bytes = data_string.encode('utf-8')
 
-        # 3. Encrypt
+        # 4. Encrypt
         encrypted_data = fernet.encrypt(data_bytes)
 
-        # 4. Write to file (encode encrypted data to base64 for safe file storage)
-        with open(save_path, "wb") as save_file: # Write bytes
+        # 5. Write to file (encode encrypted data to base64)
+        with open(save_path, "wb") as save_file:
             save_file.write(base64.urlsafe_b64encode(encrypted_data))
 
         print(f"Game saved successfully to {os.path.basename(save_path)}")
@@ -132,35 +145,25 @@ def load_game(slot_id):
     save_filename = os.path.basename(save_path) if save_path else f"slot {slot_id}"
 
     # --- Reset Inventory Before Loading/Starting Fresh ---
-    # *** FIX: Use all known item IDs for the fresh inventory structure ***
-    if not game_state.item_name_to_id:
-         print("Error: Cannot reset inventory - item_name_to_id map is empty. Data loading likely failed.")
-         # Handle this critical error appropriately - maybe return False or raise exception
-         # For now, create an empty inventory to prevent further crashes
-         fresh_inventory = {}
-    else:
-        # Use the values (which are the IDs) from the name->ID map
-        fresh_inventory = {item_id: 0 for item_id in game_state.item_name_to_id.values()}
-
-    game_state.inventory = fresh_inventory
-    print(f"Inventory reset for world slot {slot_id}.") # (Using all item IDs)
+    # Initialize with None for all slots
+    game_state.inventory = [None] * game_state.MAX_INVENTORY_SLOTS
+    print(f"Inventory reset for world slot {slot_id}.")
 
     if not os.path.exists(save_path):
         print(f"No save file found ('{save_filename}'). Starting fresh world {slot_id}.")
         # Inventory is already reset above.
         return True # Indicate success in setting up a fresh world state
 
-    key = _load_key(slot_id) # Use the key specific to this slot
+    key = _load_key(slot_id)
     if not key:
         print(f"Error: Cannot load game for slot {slot_id} without a valid encryption key.")
-        # Keep the fresh inventory state
-        return False
+        return False # Keep the fresh inventory state
 
     fernet = Fernet(key)
 
     try:
         # 1. Read from file
-        with open(save_path, "rb") as save_file: # Read bytes
+        with open(save_path, "rb") as save_file:
             encrypted_data_b64 = save_file.read()
 
         # 2. Decode base64
@@ -173,44 +176,63 @@ def load_game(slot_id):
         data_string = decrypted_bytes.decode('utf-8')
 
         # 5. Parse JSON
-        loaded_inventory_str_keys = json.loads(data_string)
+        loaded_data = json.loads(data_string)
 
-        # 6. Validate and Update game_state.inventory (which was reset above)
+        # 6. Load inventory data
+        loaded_inventory_list = loaded_data.get("inventory")
+        if not isinstance(loaded_inventory_list, list):
+             print(f"Error: Save file '{save_filename}' has invalid inventory format. Starting fresh.")
+             game_state.inventory = [None] * game_state.MAX_INVENTORY_SLOTS # Ensure reset
+             return False # Indicate load failure
+
         loaded_count = 0
-        ignored_count = 0
-        # *** FIX: Use the keys from the correctly initialized fresh_inventory ***
-        current_valid_keys = set(game_state.inventory.keys())
+        error_count = 0
+        # Recreate the inventory list from saved data
+        new_inventory = [None] * game_state.MAX_INVENTORY_SLOTS
+        for i, item_data in enumerate(loaded_inventory_list):
+            if i >= len(new_inventory): # Prevent loading more slots than currently defined
+                print(f"Warning: Save file contains more inventory slots ({len(loaded_inventory_list)}) than current max ({len(new_inventory)}). Ignoring extra slots.")
+                break
 
-        # Use the already reset inventory dictionary
-        updated_inventory = game_state.inventory
+            if item_data is None:
+                new_inventory[i] = None
+            elif isinstance(item_data, dict):
+                item_id = item_data.get("item_id")
+                quantity = item_data.get("quantity")
 
-        for key_str, count in loaded_inventory_str_keys.items():
-            try:
-                key_int = int(key_str)
-                if key_int in current_valid_keys: # Check against ALL valid item IDs
-                    if isinstance(count, int) and count >= 0:
-                        updated_inventory[key_int] = count
+                # Validate data
+                if isinstance(item_id, int) and item_id in game_state.item_id_to_name and \
+                   isinstance(quantity, int) and quantity > 0:
+                    try:
+                        # Create ItemStack, ensuring quantity doesn't exceed max stack size on load
+                        # (though saving should ideally prevent this)
+                        max_stack = game_state.ItemStack.DEFAULT_MAX_STACK # Use item-specific later if needed
+                        valid_quantity = min(quantity, max_stack)
+                        if quantity > valid_quantity:
+                             print(f"Warning: Loaded quantity {quantity} for item ID {item_id} exceeds max stack size {max_stack}. Clamping to {valid_quantity}.")
+
+                        new_inventory[i] = game_state.ItemStack(item_id, valid_quantity)
                         loaded_count += 1
-                    else:
-                        print(f"Warning: Invalid count '{count}' for item key '{key_str}' in save file. Ignoring.")
-                        ignored_count += 1
+                    except ValueError as e:
+                        print(f"Error creating ItemStack from save data (slot {i}): {e}. Ignoring item.")
+                        error_count += 1
                 else:
-                    # This should now only happen if item IDs change between game versions
-                    print(f"Warning: Item key '{key_str}' from save file not found in current game data (ID: {key_int}). Ignoring.")
-                    ignored_count += 1
-            except ValueError:
-                print(f"Warning: Invalid item key format '{key_str}' in save file. Ignoring.")
-                ignored_count += 1
+                    print(f"Warning: Invalid item data in save file (slot {i}): {item_data}. Ignoring.")
+                    error_count += 1
+            else:
+                 print(f"Warning: Unexpected data format in saved inventory (slot {i}): {item_data}. Ignoring.")
+                 error_count += 1
 
-        # game_state.inventory is already updated in place
+        game_state.inventory = new_inventory # Assign the newly loaded inventory
 
         print(f"Game loaded successfully from {save_filename}.")
-        if ignored_count > 0:
-            print(f"  ({loaded_count} items loaded, {ignored_count} items ignored due to data mismatch or errors)")
+        if error_count > 0:
+            print(f"  ({loaded_count} items loaded, {error_count} errors encountered during item loading)")
+        # Load other game state data here if added to save_data
+
         return True
 
     except FileNotFoundError:
-        # Should be caught by os.path.exists, but good practice
         print(f"Save file '{save_filename}' not found during load attempt.")
     except (InvalidToken, base64.binascii.Error):
         print(f"Error: Could not decrypt save file '{save_filename}'. It might be corrupted or the key is wrong.")
@@ -223,5 +245,7 @@ def load_game(slot_id):
 
     # If loading failed after file existence check, keep the fresh inventory
     print(f"Proceeding with fresh inventory for world {slot_id} due to load error.")
+    game_state.inventory = [None] * game_state.MAX_INVENTORY_SLOTS # Ensure reset
     return False # Indicate loading failed, but state is fresh
+
 

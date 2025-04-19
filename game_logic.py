@@ -197,6 +197,71 @@ def start_mining(block_id, quantity):
         game_state.current_screen = constants.MINING_MENU # Go back to selection
         return False
 
+
+# --- Inventory Management
+    
+def find_first_empty_slot():
+    """Finds the index of the first empty (None) slot in the inventory."""
+    for i, slot in enumerate(game_state.inventory):
+        if slot is None:
+            return i
+    return -1 # No empty slots found
+
+def add_items_to_inventory(item_id: int, quantity: int) -> int:
+    """Adds items to the player's inventory, stacking correctly.
+    Returns the number of items that could NOT be added (due to full inventory)."""
+    if quantity <=0 or item_id <=0:
+        return 0 #Nothing to add
+    remaining_quantity = quantity
+    item_name = game_state.item_id_to_name.get(item_id, f"ID:{item_id}")
+    print(f"Attempting to add {quantity} x {item_name} (ID: {item_id}) to inventory.")
+    # --- Phase 1: Add to existing, non-full stacks ---
+    for i, stack in enumerate(game_state.inventory):
+        if remaining_quantity <= 0: break # All items placed
+
+        if stack and stack.item_id == item_id and stack.quantity < stack.max_stack_size:
+            can_add_now = stack.can_add(remaining_quantity)
+            if can_add_now > 0:
+                added_now = stack.add(can_add_now)
+                remaining_quantity -= added_now
+                print(f"  Added {added_now} to existing stack in slot {i}. Remaining: {remaining_quantity}")
+
+    # --- Phase 2: Add to new stacks in empty slots ---
+    while remaining_quantity > 0:
+        empty_slot_index = find_first_empty_slot()
+        if empty_slot_index == -1:
+            print(f"  Inventory full. Could not add remaining {remaining_quantity} items.")
+            break # No empty slots left
+
+        # Determine quantity for the new stack
+        qty_for_new_stack = min(remaining_quantity, game_state.ItemStack.DEFAULT_MAX_STACK) # Use item-specific max later if needed
+
+        try:
+            new_stack = game_state.ItemStack(item_id, qty_for_new_stack)
+            game_state.inventory[empty_slot_index] = new_stack
+            remaining_quantity -= qty_for_new_stack
+            print(f"  Created new stack with {qty_for_new_stack} in slot {empty_slot_index}. Remaining: {remaining_quantity}")
+        except ValueError as e:
+            print(f"Error creating ItemStack for inventory: {e}")
+            # Prevent infinite loop if ItemStack creation fails
+            break
+        except IndexError:
+             print(f"Error: Invalid empty slot index {empty_slot_index} returned.")
+             break
+
+
+    if remaining_quantity > 0:
+        game_state.status_message = f"Inventory full! {remaining_quantity} {item_name}(s) lost."
+
+    return remaining_quantity # Return amount that couldn't be added
+
+# --- (Keep Crafting Logic: _get_grid_as_pattern, _get_grid_ingredients_list, etc.) ---
+# Note: Crafting logic (find_matching_recipe, update_crafting_result,
+# calculate_max_crafts, consume_crafting_ingredients) primarily works with
+# the crafting_grid, which already uses ItemStacks, so they might not need
+# major changes *yet*. However, how items are *taken* from the result slot
+# and *placed* into the grid/inventory will need updates in event_handler.py.
+
 # --- Crafting Logic ---
 
 def _get_grid_as_pattern(grid):
