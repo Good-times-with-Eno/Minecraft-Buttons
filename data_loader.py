@@ -175,23 +175,42 @@ def load_mining_data():
 def load_textures():
     """
     Loads item textures from the TEXTURES_DIR, resizes them,
-    and stores them in game_state.item_textures.
-    Assumes game_state.item_data is already populated by load_mining_data.
+    and stores them in game_state.item_textures using the item ID as the key.
+    Texture filenames are expected to match the item name (e.g., 'stone.png').
+    Assumes game_state.item_data and game_state.item_id_to_name are populated.
     """
-    print("Loading textures...")
-    # --- Check if item_data is populated ---
-    if not game_state.item_data: # This check should now pass if load_mining_data succeeded
+    print("Loading textures by item name...")
+    # --- Check if item_data and mappings are populated ---
+    if not game_state.item_data:
         print("Error: Item data (game_state.item_data) not loaded before trying to load textures.")
+        return False
+    if not game_state.item_id_to_name:
+        print("Error: Item ID to Name mapping (game_state.item_id_to_name) not loaded.")
         return False
 
     loaded_count = 0
     missing_count = 0
     error_count = 0
+    missing_textures = [] # Keep track of missing texture names
 
     # --- Iterate through item_data using item IDs ---
-    for item_id in game_state.item_data.keys(): # Iterate through the integer keys of item_data
-        # Texture filename should be based on the item ID (e.g., '1.png', '2.png')
-        texture_filename = f"{item_id}.png"
+    # We still iterate by ID because game_state.item_textures uses ID as the key
+    for item_id in game_state.item_data.keys():
+        # Get the item name using the ID
+        item_name = game_state.item_id_to_name.get(item_id)
+
+        if not item_name:
+            print(f"Warning: Could not find name for item ID {item_id}. Skipping texture load for this item.")
+            error_count += 1 # Treat this as an error or inconsistency
+            continue # Skip to the next item
+
+        # --- Construct filename using the item name ---
+        # Ensure the name is filesystem-friendly (replace spaces, lowercase, etc. if needed)
+        # For now, assuming names are simple like 'stone', 'wood_planks'
+        # You might need more robust handling for complex names:
+        # safe_name = item_name.lower().replace(" ", "_")
+        # texture_filename = f"{safe_name}.png"
+        texture_filename = f"{item_name}.png" # Using the direct name as requested
         texture_path = os.path.join(constants.TEXTURES_DIR, texture_filename)
 
         try:
@@ -204,9 +223,11 @@ def load_textures():
                 game_state.item_textures[item_id] = resized_texture
                 loaded_count += 1
             else:
-                # Optional: You could load a default "missing texture" image here
-                # print(f"Warning: Texture not found for item ID {item_id} at {texture_path}")
+                # Record the missing texture name for a summary warning
+                missing_textures.append(texture_filename)
                 missing_count += 1
+                # Optional: Load a default "missing texture" image here
+                # game_state.item_textures[item_id] = load_missing_texture_placeholder()
         except pygame.error as e:
             print(f"Pygame Error loading/resizing texture for item ID {item_id} ('{texture_filename}'): {e}")
             error_count += 1
@@ -216,6 +237,18 @@ def load_textures():
 
     print(f"Texture loading complete. Loaded: {loaded_count}, Missing: {missing_count}, Errors: {error_count}")
 
+    # Report missing textures if any
+    if missing_count > 0:
+        print(f"Warning: {missing_count} item textures were not found in '{constants.TEXTURES_DIR}':")
+        # Print first few missing ones to help debugging
+        for i, missing_name in enumerate(missing_textures):
+            if i < 10: # Limit the output
+                 print(f"  - {missing_name}")
+            elif i == 10:
+                 print("  - ... (and potentially more)")
+                 break
+
+
     # Decide if missing/error counts constitute a failure
     if error_count > 0:
         # Optionally set status message for critical errors
@@ -223,11 +256,4 @@ def load_textures():
         return False # Treat errors as failure
 
     # If only missing textures is acceptable, return True even if missing_count > 0
-    # You might want to log missing textures more prominently if they are unexpected.
-    if missing_count > 0:
-        print(f"Warning: {missing_count} item textures were not found in '{constants.TEXTURES_DIR}'.")
-
     return True
-
-# Note: The example load_tool_data function is removed as tool loading
-# is integrated into load_mining_data for simplicity based on the provided context.
